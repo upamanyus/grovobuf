@@ -1,4 +1,4 @@
-// Sample GrovoBuf file
+# Sample GrovoBuf file
 
 alias Blah = uint64
 enum Blah = {
@@ -8,9 +8,9 @@ enum Blah = {
 struct GetRPCReply {
   CID:uint64;
   Seq:uint64 = 1;
-  Array:[]byte; // slice of bytes
+  Array:[]byte; # slice of bytes
 }
 
 
-// Eventually, the RPC library can generate filler code from
-// rpc Put(Type) returns (OtherType)
+# Eventually, the RPC library can generate filler code from
+# rpc Put(Type) returns (OtherType)

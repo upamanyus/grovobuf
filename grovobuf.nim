@@ -54,10 +54,20 @@ proc tokenizeIdent(t:var Tokenizer) =
     t.nextChar()
   t.toks.add(Token(b:startIdx, e:t.i, startLine:startLine, startCh:startCh, filename:t.filename, src:t.src))
 
+proc tokenizeComment(t:var Tokenizer) =
+  while t.i < t.n:
+    case t.src[t.i]
+    of '\n', '\r':
+       break
+    else:
+      t.nextChar()
+
 proc tokenize(t:var Tokenizer) =
   while t.i < t.n:
     var c = t.src[t.i]
     case c
+    of '#':
+      t.tokenizeComment()
     of ' ', '\n', '\t', '\r':
       discard
     of '{', '}', '[', ']', ':', ';':
@@ -69,7 +79,7 @@ proc tokenize(t:var Tokenizer) =
     t.nextChar()
 
 proc tokenizeGrovoBuf(src:string) : seq[Token] =
-  var t = Tokenizer(toks:newSeq[Token](), i:0, n:src.len, src:src, line:0, lineOffset:0, filename:"blah.gb")
+  var t = Tokenizer(toks:newSeq[Token](), i:0, n:src.len, src:src, line:1, lineOffset:0, filename:"blah.gb")
   t.tokenize()
   return t.toks
 
