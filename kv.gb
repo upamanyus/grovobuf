@@ -1,0 +1,15 @@
+enum ShardError {
+  ENone;
+  EDontHaveShard;
+}
+
+struct GetRPCRequest {
+  CID:uint64;
+  Seq:uint64;
+  Key:uint64;
+}
+
+struct GetRPCRequest {
+  Error:ShardError
+  Value:[]byte;
+}

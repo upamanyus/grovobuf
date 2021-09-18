@@ -1,0 +1,9 @@
+= GrovoBuf grammar
+
+G    ::= { defn }
+defn ::= struct_defn | alias_defn | enum_defn
+struct_defn ::= 'struct' ident '{'
+  {ident ':' type ';'}
+'}'
+
+type ::= ident | []type | map[type]type
