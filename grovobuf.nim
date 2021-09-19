@@ -130,17 +130,19 @@ type
     n:int
     filename:string
 
-proc expect(p:Parser, k:TokenKind, msg:string) : Token =
+proc expect(p:var Parser, k:TokenKind, msg:string) : Token =
   if p.i >= p.n:
     stderr.setForegroundColor(ForegroundColor.fgRed)
     stderr.writeLine(&"{p.filename}: file ended unexpectedlyl {msg}")
     stderr.setForegroundColor(ForegroundColor.fgDefault)
   if p.toks[p.i].kind != k:
     p.toks[p.i].Error(msg)
-  return p.toks[p.i]
+  result = p.toks[p.i]
+  inc(p.i)
 
-proc parseStructDefn(p:Parser): Expr =
+proc parseStructDefn(p:var Parser): Expr =
   assert p.toks[p.i].kind == TokenKind.Struct, "expected structDefn"
+  discard p.expect(TokenKind.Struct, "expected keyword \"struct\"")
   var name = p.expect(TokenKind.Ident, "expected name of struct")
   discard p.expect(TokenKind.LBrace, "expected {")
   discard p.expect(TokenKind.RBrace, "expected }")
@@ -149,7 +151,7 @@ proc parseStructDefn(p:Parser): Expr =
 # proc parseField(p:Parser): Expr =
 # proc parseIdentifier(p:Parser): Expr =
 
-proc parse(p:Parser): Expr =
+proc parse(p:var Parser): Expr =
   while p.i < p.n:
     case p.toks[p.i].kind
     of TokenKind.Struct:
@@ -158,13 +160,15 @@ proc parse(p:Parser): Expr =
     else:
       p.toks[p.i].Error("unexpected token")
 
+proc parseGrovoBuf(src:ref string) : Expr =
+  var x = tokenizeGrovoBuf(src)
+  var p = Parser(toks:x, i:0, n:x.len(), filename:"blah.gb")
+  return p.parse()
+
 proc main() =
   var src = new(string)
   src[] = readFile("sample.gb").string
-  let x = tokenizeGrovoBuf(src)
-  echo "test"
-  echo x
-  # x[3].ErrorWithTok("this is just a test")
-  # echo repr(parseGrovoBuf(src))
+  let e = parseGrovoBuf(src)
+  echo repr(e)
 
 main()
