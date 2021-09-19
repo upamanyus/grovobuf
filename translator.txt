@@ -1,0 +1,29 @@
+= Translation of struct type
+
+Go struct definition looks pretty similar to the .gb file
+
+= Marshalling/unmarshalling
+
+Marshalling struct:
+  for all fields in struct:
+     marshall_fieldType(s.fieldName)
+
+For primitive types (ints, chars), will have marshall_{primitive}.
+
+Marshalling slice:
+  special case for []byte marshalling.
+  marshall_sliceFooStruct(s []FooStruct) {
+    marshall(len(s))
+    for i in range s {
+      marshall(f[i])
+    }
+  }
+
+Marshalling map:
+  marshall_fooBarMap (s map[foo]bar) {
+    marshall(len(s))
+    for k, v := range(s) {
+      marshall_foo(k)
+      marshall_bar(k)
+    }
+  }
