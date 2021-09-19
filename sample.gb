@@ -1,4 +1,4 @@
-struct GetRPCReply {
+blah struct GetRPCReply {
   CID:uint64;
   Seq:uint64;
   Array:[]byte; # slice of bytes

@@ -4,7 +4,8 @@ import terminal
 
 type
   TokenKind = enum
-    Ident, Struct, Alias, Enum, LBrace, RBrace
+    Ident, Struct, Alias, Enum, LBrace, RBrace, Colon, Semi, LBracket, RBracket
+    # Bracket == [], Brace = []
 
   Token = object
     b: int
@@ -14,6 +15,9 @@ type
     filename: string # XXX: maybe ref string?
     src: ref string
     kind: TokenKind
+
+proc `$`(t:Token) : string =
+  t.src[t.b..<t.e]
 
 type
   Expr = ref object of RootObj
@@ -26,17 +30,38 @@ type
   NamedType = ref object of Type
     name:Identifier
 
+  SliceType = ref object of Type
+    elt:Type
+
   StructDefn = ref object of Defn
     name:Token
     fields:seq[(Identifier,Type)]
 
-method Error(t:Token, msg:string) =
+method `$`(e:Expr) : string {.base.} =
+  quit "bug: must implement tostring for Expr"
+
+method `$`(e:Identifier) : string =
+  $e.t
+
+method `$`(n:Type) : string =
+  quit "bug: must implement tostring for Type"
+
+method `$`(n:NamedType) : string =
+  $n.name
+
+method `$`(n:SliceType) : string =
+  "[]" & $n.elt
+
+proc error(msg:string) =
   stderr.setForegroundColor(ForegroundColor.fgRed)
-  stderr.writeLine(&"{t.filename}({t.startLine}:{t.startCh}): {msg}")
+  stderr.writeLine(msg)
   stderr.setForegroundColor(ForegroundColor.fgDefault)
 
-method ErrorWithTok(t:Token, msg:string) =
-  stderr.writeLine(&"{t.filename}({t.startLine}:{t.startCh}): {t.src[t.b..t.e]} {msg}")
+method error(t:Token, msg:string) =
+  error(&"{t.filename}({t.startLine}:{t.startCh}): {msg}")
+
+method errorWithTok(t:Token, msg:string) =
+  error(&"{t.filename}({t.startLine}:{t.startCh}): {t.src[t.b..t.e]} {msg}")
 
 type
   Tokenizer = object
@@ -87,6 +112,14 @@ proc tokenizeSpecial(t:var Tokenizer) =
     k = TokenKind.LBrace
   of '}':
     k = TokenKind.RBrace
+  of ':':
+    k = TokenKind.Colon
+  of ';':
+    k = TokenKind.Semi
+  of '[':
+    k = TokenKind.LBracket
+  of ']':
+    k = TokenKind.RBracket
   else:
     discard
 
@@ -114,9 +147,7 @@ proc tokenize(t:var Tokenizer) =
     of '_', 'a'..'z', 'A'..'Z':
       t.tokenizeIdent()
     else:
-      stderr.setForegroundColor(ForegroundColor.fgRed)
-      stderr.writeLine(&"{t.filename}: unrecognized character {c}")
-      stderr.setForegroundColor(ForegroundColor.fgDefault)
+      error(&"{t.filename}: unrecognized character {c}")
 
 proc tokenizeGrovoBuf(src:ref string) : seq[Token] =
   var t = Tokenizer(toks:newSeq[Token](), i:0, n: src[].len(), src:src, line:1, lineOffset:0, filename:"blah.gb")
@@ -130,22 +161,68 @@ type
     n:int
     filename:string
 
-proc expect(p:var Parser, k:TokenKind, msg:string) : Token =
-  if p.i >= p.n:
-    stderr.setForegroundColor(ForegroundColor.fgRed)
-    stderr.writeLine(&"{p.filename}: file ended unexpectedlyl {msg}")
-    stderr.setForegroundColor(ForegroundColor.fgDefault)
-  if p.toks[p.i].kind != k:
-    p.toks[p.i].Error(msg)
+proc consume(p:var Parser) : Token =
   result = p.toks[p.i]
   inc(p.i)
 
-proc parseStructDefn(p:var Parser): Expr =
-  assert p.toks[p.i].kind == TokenKind.Struct, "expected structDefn"
+proc isKind(p:var Parser, k:TokenKind) : bool =
+  if p.i >= p.n:
+    return false
+  return p.toks[p.i].kind == k
+
+proc error(p:var Parser, msg:string) =
+  p.toks[p.i].error(msg)
+
+proc expect(p:var Parser, k:TokenKind, msg:string) : Token =
+  if p.i >= p.n:
+    error(&"{p.filename}: file ended unexpectedly {msg}")
+  result = p.toks[p.i]
+  if p.toks[p.i].kind != k:
+    p.error(msg)
+  else: # XXX: Assume that the user forgot the token if the wrong type shows up
+    inc(p.i)
+
+proc parseType(p:var Parser) : Type =
+  if p.i >= p.n:
+    error(&"{p.filename}: file ended unexpectedly, expected type")
+  case p.toks[p.i].kind
+  of TokenKind.LBracket:
+    discard p.consume()
+    discard p.expect(TokenKind.RBracket, "expecetd ]")
+    var elt = p.parseType()
+    return SliceType(elt:elt)
+  of TokenKind.Ident:
+    var t = p.consume()
+    return NamedType(name:Identifier(t:t))
+  else:
+    p.error("unexpected token")
+
+proc parseStructDefn(p:var Parser): StructDefn =
+  assert p.isKind(TokenKind.Struct), "expected structDefn"
   discard p.expect(TokenKind.Struct, "expected keyword \"struct\"")
   var name = p.expect(TokenKind.Ident, "expected name of struct")
   discard p.expect(TokenKind.LBrace, "expected {")
+  var fields = newSeq[(Identifier,Type)]()
+
+  while p.isKind(TokenKind.Ident):
+    var fieldName = p.consume()
+    discard p.expect(TokenKind.Colon, "expected ':' for struct field type")
+    var ty = p.parseType()
+    discard p.expect(TokenKind.Semi, "expected ;")
+    fields.add((Identifier(t:fieldName), ty))
+
+  result = StructDefn(name:name, fields:fields)
   discard p.expect(TokenKind.RBrace, "expected }")
+
+method prettyPrint(e:Expr) : string {.base.} =
+  quit "bug: must override this prettyPrint"
+
+method prettyPrint(e:StructDefn) : string =
+  result = ""
+  result = result & "struct " & $e.name & " {\n"
+  for field in e.fields:
+    result = result & "  " & $field[0].t & ":" & $field[1] & "\n"
+  result = result & "}"
 
 # proc parseAliasDefn(p:Parser): Expr =
 # proc parseField(p:Parser): Expr =
@@ -158,7 +235,8 @@ proc parse(p:var Parser): Expr =
       return p.parseStructDefn()
       break
     else:
-      p.toks[p.i].Error("unexpected token")
+      p.error("unexpected token")
+      discard p.consume()
 
 proc parseGrovoBuf(src:ref string) : Expr =
   var x = tokenizeGrovoBuf(src)
@@ -170,5 +248,6 @@ proc main() =
   src[] = readFile("sample.gb").string
   let e = parseGrovoBuf(src)
   echo repr(e)
+  echo prettyPrint(e)
 
 main()
