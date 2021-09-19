@@ -182,6 +182,10 @@ proc expect(p:var Parser, k:TokenKind, msg:string) : Token =
   else: # XXX: Assume that the user forgot the token if the wrong type shows up
     inc(p.i)
 
+proc parseIdentifier(p:var Parser): Identifier =
+  var t = p.expect(TokenKind.Ident, "expected identifier")
+  return Identifier(t:t)
+
 proc parseType(p:var Parser) : Type =
   if p.i >= p.n:
     error(&"{p.filename}: file ended unexpectedly, expected type")
@@ -192,8 +196,7 @@ proc parseType(p:var Parser) : Type =
     var elt = p.parseType()
     return SliceType(elt:elt)
   of TokenKind.Ident:
-    var t = p.consume()
-    return NamedType(name:Identifier(t:t))
+    return NamedType(name:p.parseIdentifier())
   else:
     p.error("unexpected token")
 
@@ -205,11 +208,11 @@ proc parseStructDefn(p:var Parser): StructDefn =
   var fields = newSeq[(Identifier,Type)]()
 
   while p.isKind(TokenKind.Ident):
-    var fieldName = p.consume()
+    var fieldIdent = p.parseIdentifier()
     discard p.expect(TokenKind.Colon, "expected ':' for struct field type")
     var ty = p.parseType()
+    fields.add((fieldIdent, ty))
     discard p.expect(TokenKind.Semi, "expected ;")
-    fields.add((Identifier(t:fieldName), ty))
 
   result = StructDefn(name:name, fields:fields)
   discard p.expect(TokenKind.RBrace, "expected }")
@@ -224,9 +227,8 @@ method prettyPrint(e:StructDefn) : string =
     result = result & "  " & $field[0].t & ":" & $field[1] & "\n"
   result = result & "}"
 
-# proc parseAliasDefn(p:Parser): Expr =
-# proc parseField(p:Parser): Expr =
-# proc parseIdentifier(p:Parser): Expr =
+proc parseAliasDefn(p:Parser): Expr =
+  discard
 
 proc parse(p:var Parser): Expr =
   while p.i < p.n:

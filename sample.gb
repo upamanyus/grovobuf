@@ -1,11 +1,11 @@
-blah struct GetRPCReply {
+# Sample GrovoBuf file
+
+
+struct GetRPCReply {
   CID:uint64;
   Seq:uint64;
   Array:[]byte; # slice of bytes
 }
-
-# Sample GrovoBuf file
-
 
 # Eventually, the RPC library can generate filler code from
 # rpc Put(Type) returns (OtherType)
