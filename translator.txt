@@ -6,24 +6,39 @@ Go struct definition looks pretty similar to the .gb file
 
 Marshalling struct:
   for all fields in struct:
-     marshall_fieldType(s.fieldName)
+     marshal_fieldType(s.fieldName)
 
-For primitive types (ints, chars), will have marshall_{primitive}.
+For primitive types (ints, chars), will have marshal_{primitive}.
 
 Marshalling slice:
   special case for []byte marshalling.
-  marshall_sliceFooStruct(s []FooStruct) {
-    marshall(len(s))
+  marshal_sliceFooStruct(s []FooStruct) {
+    marshal(len(s))
     for i in range s {
-      marshall(f[i])
+      marshal(f[i])
     }
   }
 
 Marshalling map:
-  marshall_fooBarMap (s map[foo]bar) {
-    marshall(len(s))
+  marshal_fooBarMap (s map[foo]bar) {
+    marshal(len(s))
     for k, v := range(s) {
-      marshall_foo(k)
-      marshall_bar(k)
+      marshal_foo(k)
+      marshal_bar(k)
     }
   }
+
+= Specs and proofs for Marshalling/unmarshalling
+
+* Define a Coq record corresponding to the struct we want to marshal.
+* Define an `own_Foo (ptr:loc) (s:FooCoq)` Iris predicate
+* Define an `has_encoding_Foo (data:list u8) (s:FooCoq)` relation
+* Prove spec
+  { own_Foo ptr s } marshal_Foo(ptr) { ∃ b data, ret b; own_Foo ptr s ∗
+                                       own_slice b data ∧ ⌜has_encoding_Foo data s⌝}
+
+For map marshalling, we could have a GooseLang function called
+`marshal_Map_generic` that takes in a `val` for marshalling individual keys and values.
+We could prove a higher-order spec for ``marshal_Map_generic` that depends on
+specs for the individual key/value marshal functions, specs which we should
+hopefully be able to achieve automatically.
