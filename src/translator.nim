@@ -19,43 +19,34 @@ proc newTranslator*() : Translator =
   result = Translator(coders:initTable[string,Coders](), impls:initTable[string,string]())
   result.coders["uint64"] = Coders(encoder:"encode_uint64", decoder:"decode_uint64")
 
-method addCoders(t:Translator, s:Type) : Coders {.base.} =
+method genCoder(s:Type, t:var Translator) : (Coders, string, string) {.base.} =
   quit "en/decoders unimpl for " & s.type.name
 
 proc getEncoder*(t:var Translator, s:Type) : string
 proc getDecoder(t:var Translator, s:Type) : string
 
-proc addCodersStruct(t:var Translator, s:StructType) : Coders
-
-method addCoders(t:var Translator, s:Type) : Coders =
-  if s of StructType:
-    t.addCodersStruct(cast[StructType](s))
-  elif s of NamedType:
-    quit "en/decoders not impl for named `" & $cast[NamedType](s).name & "`"
-  elif s of SliceType:
-    quit "en/decoders not impl for slice"
-  else:
-    quit "en/decoders only impl for Struct type"
-
-proc addCodersStruct(t:var Translator, s:StructType) : Coders =
+method genCoder(s:StructType, t:var Translator) : (Coders, string, string) =
   var encoderName = &"encode_{s.name}"
   var enimpl = &"func () {encoderName}(data []byte, s *{s.name}) {{\n"
   for (fname, ftype) in s.fields:
     enimpl = enimpl & (&"\tdata = {t.getEncoder(ftype)}(data, s.{fname})\n")
-
   enimpl = enimpl & "}\n"
-  if t.impls.hasKeyOrPut(encoderName, enimpl):
-    quit "bug: duplicate encoder func name"
 
   var decoderName = &"decode_{s.name}"
   var deimpl = &"func () {decoderName}(data []byte, s *{s.name}) {{\n"
   for (fname, ftype) in s.fields:
     deimpl = deimpl & (&"\tdata = {t.getDecoder(ftype)}(data, &s.{fname})\n")
-
   deimpl = deimpl & "}\n"
-  if t.impls.hasKeyOrPut(decoderName, deimpl):
+
+  return (Coders(encoder:encoderName, decoder:decoderName), enimpl, deimpl)
+
+proc addCoder(t:var Translator, s:Type) : Coders =
+  var (c, enimpl, deimpl) = s.genCoder(t)
+  if t.impls.hasKeyOrPut(c.encoder, enimpl):
+    quit "bug: duplicate encoder func name"
+  if t.impls.hasKeyOrPut(c.decoder, deimpl):
     quit "bug: duplicate decoder func name"
-  return Coders(encoder:encoderName, decoder:decoderName)
+  return c
 
 # returns name of encoder, after ensuring that it has an implementation
 proc getEncoder*(t:var Translator, s:Type) : string =
@@ -63,7 +54,7 @@ proc getEncoder*(t:var Translator, s:Type) : string =
   if t.coders.hasKey($s):
     return t.coders[$s].encoder
   else:
-    return t.addCoders(s).encoder
+    return t.addCoder(s).encoder
 
 # returns name of encoder, after ensuring that it has an implementation
 proc getDecoder(t:var Translator, s:Type) : string =
@@ -71,4 +62,4 @@ proc getDecoder(t:var Translator, s:Type) : string =
   if t.coders.hasKey($s):
     return t.coders[$s].decoder
   else:
-    return t.addCoders(s).decoder
+    return t.addCoder(s).decoder

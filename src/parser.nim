@@ -26,10 +26,10 @@ proc error(msg:string) =
   stderr.writeLine(msg)
   stderr.setForegroundColor(ForegroundColor.fgDefault)
 
-method error(t:Token, msg:string) =
+proc error(t:Token, msg:string) =
   error(&"{t.filename}({t.startLine}:{t.startCh}): {msg}")
 
-method errorWithTok(t:Token, msg:string) =
+proc errorWithTok(t:Token, msg:string) =
   error(&"{t.filename}({t.startLine}:{t.startCh}): {t.src[t.b..t.e]} {msg}")
 
 type
@@ -199,7 +199,7 @@ method prettyPrint(e:StructType) : string =
 proc parseAliasDefn(p:Parser): Expr =
   discard
 
-proc parse(p:var Parser): StructType =
+proc parse(p:var Parser): Type =
   while p.i < p.n:
     case p.toks[p.i].kind
     of TokenKind.Struct:
@@ -209,7 +209,7 @@ proc parse(p:var Parser): StructType =
       p.error("unexpected token")
       discard p.consume()
 
-proc parseGrovoBuf*(src:ref string) : StructType =
+proc parseGrovoBuf*(src:ref string) : Type =
   var x = tokenizeGrovoBuf(src)
   var p = Parser(toks:x, i:0, n:x.len(), filename:"blah.gb")
   return p.parse()
