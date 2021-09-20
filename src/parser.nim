@@ -1,43 +1,9 @@
 import strutils
 import strformat
 import terminal
+import ast
 
-type
-  TokenKind = enum
-    Ident, Struct, Alias, Enum, LBrace, RBrace, Colon, Semi, LBracket, RBracket
-    # Bracket == [], Brace = []
-
-  Token = object
-    b: int
-    e: int
-    startLine: int
-    startCh: int
-    filename: string # XXX: maybe ref string?
-    src: ref string
-    kind: TokenKind
-
-proc `$`(t:Token) : string =
-  t.src[t.b..<t.e]
-
-type
-  Expr = ref object of RootObj # FIXME: rename to "AstNode" or some such
-  Type = ref object of Expr
-
-  Defn = ref object of Expr
-  Identifier = ref object of Expr
-    t:Token
-
-  NamedType = ref object of Type
-    name:Identifier
-
-  SliceType = ref object of Type
-    elt:Type
-
-  StructDefn = ref object of Defn
-    name:Token
-    fields:seq[(Identifier,Type)]
-
-method `$`(e:Expr) : string {.base.} =
+method `$`*(e:Expr) : string {.base.} =
   quit "bug: must implement tostring for Expr"
 
 method `$`(e:Identifier) : string =
@@ -51,6 +17,9 @@ method `$`(n:NamedType) : string =
 
 method `$`(n:SliceType) : string =
   "[]" & $n.elt
+
+method `$`(n:StructType) : string =
+  $n.name
 
 proc error(msg:string) =
   stderr.setForegroundColor(ForegroundColor.fgRed)
@@ -200,7 +169,7 @@ proc parseType(p:var Parser) : Type =
   else:
     p.error("unexpected token")
 
-proc parseStructDefn(p:var Parser): StructDefn =
+proc parseStructType(p:var Parser): StructType =
   assert p.isKind(TokenKind.Struct), "expected structDefn"
   discard p.expect(TokenKind.Struct, "expected keyword \"struct\"")
   var name = p.expect(TokenKind.Ident, "expected name of struct")
@@ -214,13 +183,13 @@ proc parseStructDefn(p:var Parser): StructDefn =
     fields.add((fieldIdent, ty))
     discard p.expect(TokenKind.Semi, "expected ;")
 
-  result = StructDefn(name:name, fields:fields)
+  result = StructType(name:name, fields:fields)
   discard p.expect(TokenKind.RBrace, "expected }")
 
 method prettyPrint*(e:Expr) : string {.base.} =
   quit "bug: must override this prettyPrint"
 
-method prettyPrint(e:StructDefn) : string =
+method prettyPrint(e:StructType) : string =
   result = ""
   result = result & "struct " & $e.name & " {\n"
   for field in e.fields:
@@ -230,17 +199,17 @@ method prettyPrint(e:StructDefn) : string =
 proc parseAliasDefn(p:Parser): Expr =
   discard
 
-proc parse(p:var Parser): Expr =
+proc parse(p:var Parser): StructType =
   while p.i < p.n:
     case p.toks[p.i].kind
     of TokenKind.Struct:
-      return p.parseStructDefn()
+      return p.parseStructType()
       break
     else:
       p.error("unexpected token")
       discard p.consume()
 
-proc parseGrovoBuf*(src:ref string) : Expr =
+proc parseGrovoBuf*(src:ref string) : StructType =
   var x = tokenizeGrovoBuf(src)
   var p = Parser(toks:x, i:0, n:x.len(), filename:"blah.gb")
   return p.parse()
