@@ -42,3 +42,11 @@ For map marshalling, we could have a GooseLang function called
 We could prove a higher-order spec for ``marshal_Map_generic` that depends on
 specs for the individual key/value marshal functions, specs which we should
 hopefully be able to achieve automatically.
+
+data = marshal_uint64(data, nextint)
+
+func marshal_{typename}(data []byte, s *{typename}) {
+  // field FOO
+  data = marshal_Foo(data, s.FOO)
+  data = marshal_Bar(data, s.BAR)
+}
